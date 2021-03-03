@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ECharts</title>
+    <style type="text/css">
+        .first-row {
+            display: flex;
+        }
+        .second-row {
+            display: flex;
+        }
+        .third-row {
+            display: flex;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://lib.baomitu.com/echarts/5.0.0/echarts.min.js"></script>
+</head>
+<body>
+<div>
+</div>
+    <div>
+        <ul class="nav nav-tabs" style="background-color: black;">
+          <li role="presentation"><a href="/">Home</a></li>
+          <li role="presentation" class="active"><a href="/dnn_infer/">DNN</a></li>
+          <li role="presentation"><a href="/seir/">SEIR</a></li>
+        </ul>
+    </div>
+    <div class="first-row">
+        <div id="chart1" style="width: 50%;height:400px;"></div>
+    </div>
+<script type="text/javascript">
+    var chart1 = echarts.init(document.getElementById('chart1'));
+    var option1 = {
+        title: {
+            text: 'DNN Infer'
+        },
+        xAxis: {
+            type: 'category',
+            data: [
+                {% for item in x %}
+                    '{{item}}',
+                {% endfor %}
+            ]
+        },
+        yAxis: {
+            type: 'value'
+        },
+        series: [{
+            data: [
+                {% for item in infer %}
+                    {{item}},
+                {% endfor %}
+            ],
+            type: 'line',
+            smooth: true
+        },{
+            data: [
+                {% for item in real %}
+                    {{item}},
+                {% endfor %}
+            ],
+            type: 'line',
+            smooth: true
+        },
+        ]
+    };
+
+    chart1.setOption(option1);
+</script>
+</body>
+</html>
