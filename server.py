@@ -5,66 +5,9 @@ import csv
 import scipy.integrate as spi
 import numpy as np
 import math
-TRAIN_FILE = './COVID-19-master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv'
+TRAIN_FILE = './data/deaths/England_2021-02-27.csv'
 TEST_DATA = []
 app = Flask(__name__)
-
-@app.route('/seir/')
-def SEIR():
-    # the total number of people
-    N = 350000
-    # per capita daily exposure
-    r = 20
-    # sensing probability
-    beta = 0.8
-    # the probability of recovery
-    gamma = 0.001
-    # incubation
-    Te = 14
-    # I
-    I_0 = 555
-    # E
-    E_0 = round(I_0 * 0.26)
-    # R
-    R_0 = 45
-    # S
-    S_0 = N - I_0 - E_0 - R_0
-    # period
-    T = 62
-
-    # INI
-    INI = (S_0, E_0, I_0, R_0)
-
-    def funcSEIR(inivalue, _):
-        Y = np.zeros(4)
-        X = inivalue
-        # S
-        Y[0] = - (r * beta * X[0] * X[2]) / N
-        # E
-        Y[1] = (r * beta * X[0] * X[2]) / N - X[1] / Te
-        # I
-        Y[2] = X[1] / Te - gamma * X[2]
-        # R
-        Y[3] = gamma * X[2]
-        return Y
-
-    T_range = np.arange(0, T + 1)
-
-    RES = spi.odeint(funcSEIR, INI, T_range)
-
-    data = {}
-    data['x'] = range(T)
-    data['y1'] = RES[:, 0]
-    data['y2'] = RES[:, 1]
-    data['y3'] = RES[:, 2]
-    data['y4'] = RES[:, 3]
-    with open("./COVID-19-master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv", 'r') as f:
-        reader = list(csv.reader(f))
-        length = len(reader) - 1
-        content = list(reader[length][4:len(reader[length])])
-        data['y5'] = content
-
-    return render_template('seir.html', **data)
 
 
 @app.route('/')
@@ -120,45 +63,49 @@ def is_number(s):
 
     return False
 
-# data pretreatment
 def data_pretreatment():
+    global TEST_DATA
+    TEST_DATA = []
     # train
-    count = 0
     with open(TRAIN_FILE) as f:
+        # 数据预处理
         render = csv.reader(f)
+        max_value = 0.0
+        train_arr = []
         for row in render:
-            if count != 502:
-                count += 1
-                continue
-            for i in range(len(row[4:66])):
-                if i > 31:
-                    break
-                temp = []
-                temp_row = row[i+4: i + 35]
-                count2 = 0
-                for item in temp_row:
-                    if is_number(item):
-                        temp.append(normalization(float(item), 336004, 0))
-                    else:
-                        temp.append(0.0)
-                    count2 += 1
+            if row[0] != '' and is_number(row[4]):
+                train_arr.append(float(row[4]))
+                if float(row[4]) > max_value:
+                    max_value = float(row[4])
+        train_arr.reverse()
+        # 预处理结束
+        train_arr_length = len(train_arr)
+        for i in range(train_arr_length - 31*2, train_arr_length - 31):
+            temp = []
+            temp_row = train_arr[i: i + 31]
+            for item in temp_row:
+                if is_number(item):
+                    temp.append(normalization(float(item),max_value,0))
+                else:
+                    temp.append(0.0)
 
-                row_data = np.array(temp, dtype='float32')
-                TEST_DATA.append(row_data[:30])
-            count += 1
+            row_data = np.array(temp, dtype='float32')
+            TEST_DATA.append(row_data[:30])
+        return max_value, train_arr
 
 
 
 
 @app.route('/dnn_infer/', methods=['GET'])
 def dnn_infer():
-    data_pretreatment()
-    place = fluid.CUDAPlace(0)
+    max_value, real_data = data_pretreatment()
+    # place = fluid.CUDAPlace(0)
+    place = fluid.CPUPlace()
     infer_exe = fluid.Executor(place)
     inference_scope = fluid.core.Scope()
 
     pred_array = []
-
+    # finall_pred_array = []
     with fluid.scope_guard(inference_scope):
         [inference_program, feed_target_names,
          fetch_targets] = fluid.io.load_inference_model("./model", infer_exe)
@@ -167,28 +114,26 @@ def dnn_infer():
         results = infer_exe.run(inference_program,
                                 feed={feed_target_names[0]: np.array(iris_feat)},
                                 fetch_list=fetch_targets)
-
-        print("Iris results: (Iris Type)")
+        # print("Iris results: (Iris Type)")
         for idx, val in enumerate(results[0]):
-            pred = round(anti_normalization(val[0], 336004, 0))
+            pred = round(anti_normalization(val[0], max_value, 0))
             # pred = val[0]
             pred_array.append(pred)
             # print("%d: %f" % (idx, pred))
-        temp_list = list(TEST_DATA[0])
-        for i in range(len(temp_list)):
-            temp_list[i] = round(anti_normalization(temp_list[i], 336004, 0))
+        temp_list = real_data[0: len(real_data) - 31]
+        # for i in range(len(temp_list)):
+        #     temp_list[i] = round(anti_normalization(temp_list[i], max_value, 0))
         temp_list.extend(pred_array)
-        pred_array = temp_list
+        finall_pred_array = temp_list
     data = {}
-    data['infer'] = pred_array
-    data['x'] = range(len(pred_array))
-    with open("./COVID-19-master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv", 'r') as f:
-        reader = list(csv.reader(f))
-        length = len(reader) - 1
-        content = list(reader[length][4:len(reader[length])])
-        data['real'] = content
-        print(len(data['real']))
-    f.close()
+    data['infer'] = finall_pred_array
+    data['x'] = range(len(real_data))
+    data['real'] = real_data
+    print("real_data:",len(real_data))
+    # print(real_data)
+    print("temp_list:", len(finall_pred_array))
+    # print(finall_pred_array)
+    # exit()
     return render_template('dnn.html', **data)
 
 

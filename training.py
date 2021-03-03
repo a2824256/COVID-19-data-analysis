@@ -12,7 +12,7 @@ TRAIN_DATA = []
 TEST_DATA = []
 TRAIN_RES = []
 TEST_RES = []
-TRAIN_FILE = './data/Prediction/Deaths/'
+TRAIN_FILE = './data/deaths/England_2021-02-27.csv'
 TEST_FILE = ''
 
 def normalization(x, max, min):
@@ -42,49 +42,51 @@ def is_number(s):
 # 数据预处理
 def data_pretreatment():
     # train
-    count = 0
     with open(TRAIN_FILE) as f:
+        # 数据预处理
         render = csv.reader(f)
+        max_value = 0.0
+        train_arr = []
         for row in render:
-            if count != 502:
-                count += 1
-                continue
-            for i in range(len(row[4:66])):
-                if i > 31:
-                    break
-                temp = []
-                temp_row = row[i+4: i + 35]
-                count2 = 0
-                for item in temp_row:
-                    if is_number(item):
-                        temp.append(normalization(float(item),336004,0))
-                    else:
-                        temp.append(0.0)
-                    count2 += 1
+            if row[0] != '' and is_number(row[4]):
+                train_arr.append(float(row[4]))
+                if float(row[4]) > max_value:
+                    max_value = float(row[4])
+        train_arr.reverse()
+        # 预处理结束
+        train_arr_length = len(train_arr)
+        for i in range(train_arr_length):
+            if i > train_arr_length - 31:
+                break
+            temp = []
+            temp_row = train_arr[i: i + 31]
+            for item in temp_row:
+                if is_number(item):
+                    temp.append(normalization(float(item),max_value,0))
+                    # temp.append(item)
+                else:
+                    temp.append(0.0)
 
-                row_data = np.array(temp, dtype='float32')
-                TRAIN_DATA.append(row_data[:30])
-                TRAIN_RES.append([row_data[30]])
-            for i in range(len(row[4:66])):
-                if i > 31:
-                    break
-                temp = []
-                temp_row = row[i + 4: i + 35]
-                count2 = 0
-                for item in temp_row:
-                    if is_number(item):
-                        temp.append(normalization(float(item),336004,0))
-                    else:
-                        temp.append(0.0)
-                    count2 += 1
+            row_data = np.array(temp, dtype='float32')
+            TRAIN_DATA.append(row_data[:30])
+            TRAIN_RES.append([row_data[30]])
+        for i in range(train_arr_length - 31*2, train_arr_length - 31):
+            temp = []
+            temp_row = train_arr[i: i + 31]
+            for item in temp_row:
+                if is_number(item):
+                    temp.append(normalization(float(item),max_value,0))
+                    # temp.append(item)
+                else:
+                    temp.append(0.0)
 
-                row_data = np.array(temp, dtype='float32')
-                TEST_DATA.append(row_data[:30])
-                TEST_RES.append([row_data[30]])
-            count += 1
+            row_data = np.array(temp, dtype='float32')
+            TEST_DATA.append(row_data[:30])
+            TEST_RES.append([row_data[30]])
 
 data_pretreatment()
-# print(len(TRAIN_DATA))
+# print(TRAIN_DATA)
+# print(TRAIN_RES)
 # exit()
 # for i in TRAIN_DATA:
 #     print(i)
@@ -140,9 +142,11 @@ test_reader = fluid.io.batch(test_sample_reader, batch_size=100)
 INPUT = fluid.data(name='input', shape=[None, 30], dtype='float32')
 # the output is the number
 OUTPUT = fluid.data(name='label', shape=[None, 1], dtype='float32')
-hidden = fluid.layers.fc(name='fc1', input=INPUT, size=60, act='relu')
-hidden = fluid.layers.fc(name='fc2', input=hidden, size=30, act='relu')
-hidden = fluid.layers.fc(name='fc3', input=hidden, size=10, act='relu')
+hidden = fluid.layers.fc(name='fc1', input=INPUT, size=120, act='relu')
+hidden = fluid.layers.fc(name='fc2', input=hidden, size=80, act='relu')
+hidden = fluid.layers.fc(name='fc3', input=hidden, size=60, act='relu')
+hidden = fluid.layers.fc(name='fc4', input=hidden, size=40, act='relu')
+hidden = fluid.layers.fc(name='fc5', input=hidden, size=30, act='relu')
 prediction = fluid.layers.fc(name='output', input=hidden, size=1, act='relu')
 
 # main program
@@ -160,7 +164,8 @@ adam = fluid.optimizer.Adam(learning_rate=0.001)
 adam.minimize(loss)
 
 # 选择gpu 0
-place = fluid.CUDAPlace(0)
+# place = fluid.CUDAPlace(0)
+place = fluid.CPUPlace()
 exe = fluid.Executor(place)
 # 迭代次数
 num_epochs = 100

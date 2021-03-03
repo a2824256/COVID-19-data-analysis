@@ -22,9 +22,9 @@
 </div>
     <div>
         <ul class="nav nav-tabs" style="background-color: black;">
-          <li role="presentation"><a href="/">Home</a></li>
+{#          <li role="presentation"><a href="/">Home</a></li>#}
           <li role="presentation" class="active"><a href="/dnn_infer/">DNN</a></li>
-          <li role="presentation"><a href="/seir/">SEIR</a></li>
+{#          <li role="presentation"><a href="/seir/">SEIR</a></li>#}
         </ul>
     </div>
     <div class="first-row">
@@ -34,7 +34,7 @@
     var chart1 = echarts.init(document.getElementById('chart1'));
     var option1 = {
         title: {
-            text: 'DNN Infer'
+            text: 'Prediction of death toll of COVID-19 in England in recent one month'
         },
         xAxis: {
             type: 'category',
